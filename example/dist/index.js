@@ -58,7 +58,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	__webpack_require__(1);
 	var Vue = __webpack_require__(5);
-	
+	Vue.use(__webpack_require__(7));
 	new Vue({
 	    el: 'body',
 	    data: function data() {
@@ -80,7 +80,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	    },
 	    components: {
-	        'actionsheet': __webpack_require__(12)
+	        'actionsheet': __webpack_require__(11)
 	    }
 	});
 
@@ -10794,19 +10794,443 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 7 */,
-/* 8 */,
-/* 9 */,
-/* 10 */,
-/* 11 */,
-/* 12 */
+/* 7 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var Touch = __webpack_require__(8);
+	
+	var app = module.exports = {};
+	app.install = function (Vue, options) {
+	    Vue.directive('touch', {
+	        acceptStatement: true,
+	        bind: function () {
+	            var self = this;
+	            var touch = this.touch = new Touch(this.el);
+	            var longTapTimeout = null;
+	            touch.on('touch:start', function (res) {
+	                var e = res.e;
+	                e.preventDefault();
+	                longTapTimeout = setTimeout(function () {
+	                    if (self.arg === 'longtap') {
+	                        self.handler(e);
+	                    }
+	                }, 750);
+	            });
+	
+	            touch.on('touch:move', function () {
+	                clearTimeout(longTapTimeout);
+	            });
+	
+	            touch.on('touch:end', function (res) {
+	                clearTimeout(longTapTimeout);
+	
+	                if (self.arg === 'tap' && Math.abs(res.x1 - res.x2) < 30 && Math.abs(res.y1 - res.y2) < 30) {
+	                    self.handler(res.e);
+	                }
+	            });
+	
+	            touch.start();
+	        },
+	        update: function (cb) {
+	            if (typeof cb === 'function') {
+	                this.handler = cb;
+	            } else {
+	                this.handler = function () {
+	                    console.warn('[vue][directive][touch]请设置后调函数:' + self.arg + '="' + self.descriptor.raw + '"');
+	                };
+	            }
+	        },
+	        unbind: function () {
+	            //删除dom监听事件
+	            this.touch._remove();
+	            this.touch = null;
+	        }
+	    });
+	}
+
+/***/ },
+/* 8 */
+/***/ function(module, exports, __webpack_require__) {
+
+	//触摸事件处理
+	var Event = __webpack_require__(9);
+	var domEventHelper = __webpack_require__(10);
+	
+	function Touch(el) {
+	    Event.call(this);
+	    this.el = el || document;
+	    this.touch = null;
+	    this.lastTimestamp = Date.now();
+	    this.spend = 0;
+	    this.x1 = this.y1 = this.x2 = this.y2 = undefined;
+	}
+	
+	Touch.prototype = Object.create(Event.prototype, {
+	    'constructor': {
+	        value: Touch
+	    }
+	});
+	
+	Touch.prototype._add = function () {
+	    domEventHelper.add(this.el, 'touchstart', this.touchStart.bind(this), false);
+	    domEventHelper.add(this.el, 'touchmove', this.touchMove.bind(this), false);
+	    domEventHelper.add(this.el, 'touchend', this.touchEnd.bind(this), false);
+	    domEventHelper.add(this.el, 'touchcancel', this.touchCancel.bind(this), false);
+	};
+	
+	Touch.prototype._remove = function () {
+	    domEventHelper.remove(this.el, 'touchstart');
+	    domEventHelper.remove(this.el, 'touchmove');
+	    domEventHelper.remove(this.el, 'touchend');
+	    domEventHelper.remove(this.el, 'touchcancel');
+	};
+	
+	Touch.prototype.touchStart = function (e) {
+	    this.lastTimestamp = Date.now();
+	    var touch = e.touches[0];
+	    this.touch = touch;
+	    this.touch.el = 'tagName' in touch.target ?
+	        touch.target : touch.target.parentNode;
+	
+	    this.x2 = this.x1 = touch.pageX;
+	    this.y2 = this.y1 = touch.pageY;
+	    this.trigger('touch:start', {
+	        x1: this.x1,
+	        y1: this.y1,
+	        e: e,
+	        el: this.touch.el,
+	        timestamp: this.lastTimestamp
+	    });
+	};
+	
+	Touch.prototype.touchMove = function (e) {
+	    this.spend = Date.now() - this.lastTimestamp;
+	    var touch = e.touches[0];
+	    var yrange = 0;
+	    var xrange = 0;
+	    if (this.y2) {
+	        yrange = this.y2 - touch.pageY;
+	        xrange = this.x2 - touch.pageX;
+	    }
+	
+	    this.x2 = touch.pageX;
+	    this.y2 = touch.pageY;
+	
+	    this.trigger('touch:move', {
+	        x1: this.x1,
+	        y1: this.y1,
+	        x2: this.x2,
+	        y2: this.y2,
+	        e: e,
+	        toUp: yrange > 0,
+	        toLeft: xrange > 0,
+	        xrange: xrange,
+	        yrange: yrange,
+	        spend: this.spend
+	    });
+	};
+	
+	Touch.prototype.touchEnd = function (e) {
+	    this.spend = Date.now() - this.lastTimestamp;
+	    this.trigger('touch:end', {
+	        x1: this.x1,
+	        y1: this.y1,
+	        x2: this.x2,
+	        y2: this.y2,
+	        dir: swipeDirection(this.x1, this.x2, this.y1, this.y2),
+	        e: e,
+	        spend: this.spend
+	    });
+	};
+	
+	Touch.prototype.touchCancel = function () {
+	    //this.pause('touch:start touch:move touch:end');
+	    this.trigger('touch:cancel', {
+	        x1: this.x1,
+	        y1: this.y1,
+	        x2: this.x2,
+	        y2: this.y2,
+	        dir: swipeDirection(this.x1, this.x2, this.y1, this.y2),
+	        spend: this.spend
+	    });
+	    this.spend = 0;
+	    this.touch = null;
+	    this.x1 = this.y1 = this.x2 = this.y2 = undefined;
+	};
+	
+	Touch.prototype.start = function () {
+	    this._add();
+	    var _this = this;
+	    window.addEventListener('scroll', function (e) {
+	        // this.touchCancel();
+	        _this.trigger('scroll', e);
+	    }, false);
+	
+	    //重新绑定dom
+	    this.on('touch:el', function (e) {
+	        _this._remove();
+	        _this.el = el;
+	        _this._add();
+	    });
+	};
+	
+	function swipeDirection(x1, x2, y1, y2) {
+	    return Math.abs(x1 - x2) >=
+	    Math.abs(y1 - y2) ? (x1 - x2 > 0 ? 'left' : 'right') : (y1 - y2 > 0 ? 'up' : 'down')
+	}
+	
+	module.exports = Touch;
+
+/***/ },
+/* 9 */
+/***/ function(module, exports, __webpack_require__) {
+
+	(function () {
+	
+	    /**
+	     * Event事件对象
+	     * cxt上下文
+	     * @constructor
+	     */
+	    function Event(cxt) {
+	        this._events = {};
+	        this.cxt = cxt;
+	    }
+	
+	    //off,pause,resume通用方法
+	    function eventsApi(self, name, cb, cxt) {
+	        var events = {};
+	
+	        for (var key in self._events) {
+	            events[key] = self._events[key];
+	        }
+	
+	        if (name) {
+	            events = {};
+	            name.split(/\s/).forEach(function (ename) {
+	                if (ename && self._events[ename]) {
+	                    events[ename] = self._events[ename];
+	                }
+	            });
+	        }
+	
+	        var keys = Object.keys(events);
+	        if (keys.length === 0) return this;
+	
+	        if (cb && typeof cb === 'function') {
+	            keys.forEach(function (key) {
+	                events[key] = events[key].filter(function (event) {
+	                    return event.cb == cb;
+	                });
+	            });
+	        }
+	
+	        if (cxt) {
+	            keys.forEach(function (key) {
+	                events[key] = events[key].filter(function (event) {
+	                    return event.cxt == cxt;
+	                });
+	            });
+	        }
+	
+	        return events;
+	    }
+	
+	    //暂停,恢复通用方法
+	    function eventsPauseApi(self, name, cb, cxt, val) {
+	        var events = eventsApi(self, name, cb, cxt);
+	        for (var key in events) {
+	            events[key].forEach(function (item) {
+	                item.pause = val;
+	            });
+	        }
+	    }
+	
+	    //on,once通用方法
+	    function eventsOnApi(self, name, cb, cxt, once) {
+	        if (!name || typeof cb != 'function' || typeof name !== 'string') return this;
+	        name.split(/\s/).forEach(function (ename) {
+	            if (!ename) return;
+	            var handlers = self._events[ename] || [];
+	            handlers.push({
+	                cb: cb,
+	                cxt: cxt || self.cxt || self,
+	                pause: false,
+	                i: 0,
+	                once: once
+	            });
+	            self._events[ename] = handlers;
+	        });
+	    }
+	
+	    /**
+	     * 绑定一个事件
+	     * @param name 只能是字符串
+	     * @param cb
+	     * @param cxt
+	     * @returns {Event}
+	     */
+	    Event.prototype.on = function (name, cb, cxt) {
+	        eventsOnApi(this, name, cb, cxt, false);
+	        return this;
+	    };
+	
+	    Event.prototype.once = function (name, cb, cxt) {
+	        eventsOnApi(this, name, cb, cxt, true);
+	        return this;
+	    };
+	
+	    /**
+	     * 卸载某个事件
+	     * @param name
+	     * @returns {Event}
+	     */
+	    Event.prototype.off = function (name, cb, cxt) {
+	
+	        var events = eventsApi(this, name, cb, cxt);
+	        for (var key in events) {
+	            var e = this._events[key];
+	            events[key].slice(0).forEach(function (item) {
+	                e.splice(e.indexOf(item), 1);
+	            });
+	        }
+	
+	        return this;
+	    }
+	
+	    /**
+	     * 暂停某个事件,用法同off
+	     * @param name
+	     * @returns {Event}
+	     */
+	    Event.prototype.pause = function (name, cb, cxt) {
+	        eventsPauseApi(this, name, cb, cxt, true);
+	        return this;
+	    };
+	
+	    /**
+	     * 恢复某个事件,用法同off
+	     * @param name
+	     * @returns {Event}
+	     */
+	    Event.prototype.resume = function (name, cb, cxt) {
+	        eventsPauseApi(this, name, cb, cxt, false);
+	        return this;
+	    };
+	
+	    /**
+	     * 触发某个事件
+	     * @param name
+	     * @returns {Event}
+	     */
+	    Event.prototype.trigger = function (name) {
+	
+	        var self = this;
+	        if (!name || typeof name !== 'string') return this;
+	        var len = arguments.length;
+	        var args = [], i = 1;
+	        while (i < len) {
+	            args.push(arguments[i++]);
+	        }
+	
+	        name.split(/\s/).forEach(function (ename) {
+	            if (ename && self._events[ename]) {
+	                self._events[ename].forEach(function (handle) {
+	                    if (!handle.pause && !(handle.i === 1 && handle.once)) {
+	                        handle.cb.apply(handle.cxt, args);
+	                        handle.i++;
+	                    }
+	                });
+	            }
+	        });
+	
+	        return this;
+	    };
+	
+	    if (true) {
+	        if (typeof module !== 'undefined' && module.exports) {
+	            exports = module.exports = Event;
+	        }
+	        exports.Event = Event;
+	    } else {
+	        window.Event = Event;
+	    }
+	
+	})();
+
+/***/ },
+/* 10 */
+/***/ function(module, exports, __webpack_require__) {
+
+	(function () {
+	
+	    var stack = {};
+	    var i = 1;
+	    var helper = {};
+	
+	    helper.add = function (el, event, cb, useCapture) {
+	        el._uid = el._uid || i++;
+	        var obj = stack[el._uid] = stack[el._uid] ? stack[el._uid] : {};
+	        var arr = obj[event] = obj[event] ? obj[event] : [];
+	        arr.push(cb);
+	        el.addEventListener(event, cb, !!useCapture);
+	    };
+	
+	    helper.remove = function (el, event, cb) {
+	        if (typeof cb === 'function' && cb.name) {
+	            el.removeEventListener(event, cb);
+	        } else if (el._uid && stack[el._uid]) {
+	            var obj = stack[el._uid];
+	            var keys = [];
+	            if (event) {
+	                if (obj[event]) {
+	                    keys.push(event);
+	                }
+	            } else {
+	                keys = Object.keys(obj);
+	            }
+	
+	            keys.forEach(function (key) {
+	                obj[key].forEach(function (_cb) {
+	                    el.removeEventListener(event, _cb);
+	                });
+	                delete obj[key];
+	            });
+	
+	        }
+	    };
+	
+	    //引入Node中
+	    Node.prototype.addEvent = function (event, cb, useCapture) {
+	        helper.add(this, event, cb, useCapture);
+	        return this;
+	    }
+	
+	    Node.prototype.removeEvent = function (event, cb) {
+	        helper.remove(this, event, cb);
+	        return this;
+	    }
+	
+	    if (true) {
+	        if (typeof module !== 'undefined' && module.exports) {
+	            exports = module.exports = helper;
+	        }
+	        exports.domEventHelper = helper;
+	    } else {
+	        window.domEventHelper = helper;
+	    }
+	
+	})();
+
+/***/ },
+/* 11 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
-	__webpack_require__(13);
+	__webpack_require__(12);
 	module.exports = {
-	    template: __webpack_require__(15),
+	    template: __webpack_require__(14),
 	    data: function data() {
 	        return { fade: false };
 	    },
@@ -10866,13 +11290,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	};
 
 /***/ },
-/* 13 */
+/* 12 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// style-loader: Adds some css to the DOM by adding a <style> tag
 	
 	// load the styles
-	var content = __webpack_require__(14);
+	var content = __webpack_require__(13);
 	if(typeof content === 'string') content = [[module.id, content, '']];
 	// add the styles to the DOM
 	var update = __webpack_require__(4)(content, {});
@@ -10892,7 +11316,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 
 /***/ },
-/* 14 */
+/* 13 */
 /***/ function(module, exports, __webpack_require__) {
 
 	exports = module.exports = __webpack_require__(3)();
@@ -10906,10 +11330,10 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 15 */
+/* 14 */
 /***/ function(module, exports) {
 
-	module.exports = "<div class=\"m-actionsheet-box\" v-show=\"open\">\n  <div @click='close' class=\"m-shade-layer\" :class=\"{'m-shade-layer-fade': fade}\"></div>\n  <div class=\"m-actionsheet-body\" :class=\"{'m-actionsheet-body-fade': fade}\">\n    <div class=\"m-actionsheet-cnt\">\n      <ul>\n        <li @click=\"choose(item)\" v-for=\"item in list\" data-value=\"{{item[value]}}\">\n          {{item[label]}}\n        </li>\n        <li @click=\"choose({value:'-1',label:'取消'})\">取消</li>\n      </ul>\n    </div>\n  </div>\n</div>";
+	module.exports = "<div class=\"m-actionsheet-box\" v-show=\"open\">\n  <div v-touch:tap='close' class=\"m-shade-layer\" :class=\"{'m-shade-layer-fade': fade}\"></div>\n  <div class=\"m-actionsheet-body\" :class=\"{'m-actionsheet-body-fade': fade}\">\n    <div class=\"m-actionsheet-cnt\">\n      <ul>\n        <li v-touch:tap=\"choose(item)\" v-for=\"item in list\" data-value=\"{{item[value]}}\">\n          {{item[label]}}\n        </li>\n        <li v-touch:tap=\"choose({value:'-1',label:'取消'})\">取消</li>\n      </ul>\n    </div>\n  </div>\n</div>";
 
 /***/ }
 /******/ ])

@@ -1,6 +1,6 @@
 require('./style.css');
 var Vue = require('vue');
-
+Vue.use(require('vue-m-touch'));
 new Vue({
     el: 'body',
     data: function () {
