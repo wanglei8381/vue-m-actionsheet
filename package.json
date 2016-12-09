@@ -23,8 +23,7 @@
     "prepublish": "npm run move && npm run compile"
   },
   "dependencies": {
-    "vue": "^1.0.24",
-    "vue-m-touch": "^0.0.2"
+    "vue-m-touch": "^0.0.6"
   },
   "devDependencies": {
     "babel-core": "^6.9.0",
