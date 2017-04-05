@@ -10,14 +10,12 @@
   <base target="_blank">
 </head>
 <body>
-
-<section class="m-body uf-g1 uf uf-rev uf-ac uf-jc">
-  <div style="padding: 20px 0">{{msg}}</div>
-  <button class="btn" @click="choose">actionsheet</button>
-</section>
-
-<actionsheet :open.sync="open" :picker.sync="picker" :list="list"></actionsheet>
-
-<script src="dist/index.js"></script>
+<div id="app">
+  <section class="m-body uf-g1 uf uf-rev uf-ac uf-jc">
+    <div style="padding: 20px 0">{{msg}}</div>
+    <button class="btn" @click="choose">actionsheet</button>
+  </section>
+  <actionsheet :list="list" :open="open" :confirm="confirm" :cancel="cancel"></actionsheet>
+</div>
 </body>
 </html>
