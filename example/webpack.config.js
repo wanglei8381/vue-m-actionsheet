@@ -1,6 +1,9 @@
+let path = require('path')
 module.exports = {
   files: {
-    'src/index.js': 1
+    'example/src/index.js': 1
   },
-  index: 'index.html'
+  publicPath: './',
+  context: path.resolve(__dirname, '../'),
+  index: 'example/index.html'
 }

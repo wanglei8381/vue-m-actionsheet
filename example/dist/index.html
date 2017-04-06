@@ -1,1 +1,21 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,minimum-scale=1,maximum-scale=1"><meta name="referrer" content="always"><meta name="renderer" content="webkit"><meta http-equiv="X-UA-Compatible" content="IE=edge"><base target="_blank"></head><body><section class="m-body uf-g1 uf uf-rev uf-ac uf-jc"><div style="padding:20px 0">{{msg}}</div><button class="btn" @click="choose">actionsheet</button></section><actionsheet :open.sync="open" :picker.sync="picker" :list="list"></actionsheet><script type="text/javascript" src="//static.wuage.com/example/dist/index.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,minimum-scale=1,maximum-scale=1">
+  <meta name="referrer" content="always">
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <base target="_blank">
+</head>
+<body>
+<div id="app">
+  <section class="m-body uf-g1 uf uf-rev uf-ac uf-jc">
+    <div style="padding:20px 0">{{msg}}</div>
+    <button class="btn" @click="choose">actionsheet</button>
+  </section>
+  <actionsheet :list="list" :open="open" :confirm="confirm" :cancel="cancel"></actionsheet>
+</div>
+<script type="text/javascript" src="./index.js"></script>
+</body>
+</html>

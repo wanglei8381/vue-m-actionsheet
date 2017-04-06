@@ -25,6 +25,6 @@ new Vue({
     }
   },
   components: {
-    'actionsheet': require('../../index.vue')
+    'actionsheet': require('../../src/index.vue')
   }
 })
